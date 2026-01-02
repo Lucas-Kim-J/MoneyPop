@@ -71,6 +71,20 @@ npm run preview
 ├── vite.config.js
 └── src
     ├── App.jsx
+    ├── components
+    │   ├── BudgetOverview.jsx
+    │   ├── Button.jsx
+    │   ├── Card.jsx
+    │   ├── HeaderSnapshot.jsx
+    │   ├── IncomeVault.jsx
+    │   ├── RegretCard.jsx
+    │   ├── TransactionForm.jsx
+    │   ├── TransactionList.jsx
+    │   └── UndoSticker.jsx
+    ├── data
+    │   └── categories.jsx
     ├── main.jsx
+    ├── services
+    │   └── deepseek.js
     └── index.css
 ```

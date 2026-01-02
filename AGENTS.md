@@ -4,6 +4,7 @@
 
 - Root configuration lives in `package.json`, `vite.config.js`, `tailwind.config.js`, `postcss.config.js`, and `index.html`.
 - Source code is in `src/` with `src/main.jsx` as the entry and `src/App.jsx` as the top-level component.
+- UI building blocks live in `src/components/`; shared data lives in `src/data/`; API calls live in `src/services/`.
 - Styles start in `src/index.css`; add assets under `src/assets/` when needed.
 - Deployment workflow is in `.github/workflows/deploy.yml` for GitHub Pages.
 - The root `app.jsx` is not used by Vite; remove or keep as legacy as needed.
