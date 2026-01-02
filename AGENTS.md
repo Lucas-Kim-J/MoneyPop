@@ -2,10 +2,11 @@
 
 ## Project Structure & Module Organization
 
-- Root configuration lives in `package.json`, `vite.config.js`, and `index.html`.
+- Root configuration lives in `package.json`, `vite.config.js`, `tailwind.config.js`, `postcss.config.js`, and `index.html`.
 - Source code is in `src/` with `src/main.jsx` as the entry and `src/App.jsx` as the top-level component.
-- Styles start in `src/index.css`; place additional assets under `src/assets/` when needed.
-- The root `app.jsx` is unused by the Vite setup and can be removed once no longer needed.
+- Styles start in `src/index.css`; add assets under `src/assets/` when needed.
+- Deployment workflow is in `.github/workflows/deploy.yml` for GitHub Pages.
+- The root `app.jsx` is not used by Vite; remove or keep as legacy as needed.
 
 ## Build, Test, and Development Commands
 
@@ -19,6 +20,7 @@
 - Use consistent, conventional JavaScript/JSX style across files you touch: 2-space indentation, trailing semicolons, and single quotes are acceptable defaults if you are establishing a style.
 - Prefer `PascalCase` for React-style components and `camelCase` for variables, functions, and file names.
 - Keep file names short and descriptive; avoid abbreviations unless they are widely understood.
+- Tailwind utility classes are used for styling; keep class order readable and avoid deeply nested custom CSS unless needed.
 
 ## Testing Guidelines
 
@@ -28,10 +30,17 @@
 
 ## Commit & Pull Request Guidelines
 
-- There is no Git history in this folder. Use short, imperative commit messages (e.g., “Add initial UI scaffold”).
+- Use short, imperative commit messages (e.g., “Add GitHub Pages deploy workflow”).
 - PRs should describe the change, list any manual verification performed, and include screenshots for UI updates.
 
 ## Configuration & Environment Notes
 
-- Document any required environment variables or local setup in this file or a `README.md` once they exist.
-- Keep secrets out of the repo; use `.env` files and add them to `.gitignore`.
+- Required local env: `VITE_DEEPSEEK_API_KEY` in `.env` for AI features.
+- GitHub Pages builds read `VITE_DEEPSEEK_API_KEY` from repository secrets (Actions).
+- Optional env defaults: `VITE_DEEPSEEK_MODEL=deepseek-chat`, `VITE_DEEPSEEK_BASE_URL=https://api.deepseek.com`.
+- Keep secrets out of the repo; `.env` must stay in `.gitignore`.
+
+## Deployment (GitHub Pages)
+
+- Vite base path is set to `/MoneyPop/` in `vite.config.js`.
+- Push to `main` triggers the GitHub Actions workflow and publishes `dist/` to Pages.
