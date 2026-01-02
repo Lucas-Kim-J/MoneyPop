@@ -25,15 +25,17 @@ export default function BudgetOverview({
     >
       <div className="flex justify-between items-start mb-2 relative z-10">
         <div>
-          <h2 className="text-2xl font-black uppercase">本月预算剩余</h2>
-          <div className="flex items-center gap-2 mt-1 font-bold text-slate-700">
+          <h2 className="text-2xl font-black uppercase bg-white inline-block px-1 border-2 border-black -rotate-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+            本月预算剩余
+          </h2>
+          <div className="flex items-center gap-2 mt-2 font-bold text-slate-700">
             {status.icon} <span>{status.text}</span>
           </div>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onGenerateRoast}
-            className="bg-black text-white p-2 rounded hover:scale-110 transition-transform flex items-center gap-1"
+            className="bg-black text-white p-2 rounded hover:scale-110 transition-transform flex items-center gap-1 shadow-[4px_4px_0px_0px_rgba(128,128,128,1)] active:shadow-none active:translate-y-1 active:translate-x-1"
             title="让AI点评你的财务状况"
           >
             <Bot size={20} />
@@ -41,7 +43,7 @@ export default function BudgetOverview({
           </button>
           <button
             onClick={onEditBudget}
-            className="bg-white border-2 border-black text-black p-2 rounded hover:bg-slate-100 transition-colors"
+            className="bg-white border-2 border-black text-black p-2 rounded hover:bg-slate-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
           >
             <TrendingUp size={20} />
           </button>
@@ -73,14 +75,18 @@ export default function BudgetOverview({
         </div>
       ) : (
         <div className="flex items-baseline gap-2 mb-4 relative z-10">
-          <span className={`text-6xl font-black tracking-tight ${remainingBudget < 0 ? 'text-red-600' : 'text-black'}`}>
+          <span
+            className={`text-6xl font-black tracking-tight ${
+              remainingBudget < 0 ? 'text-red-600' : 'text-black'
+            } drop-shadow-md`}
+          >
             ¥{remainingBudget.toFixed(0)}
           </span>
           <span className="text-xl font-bold text-slate-600">/ 可支配</span>
         </div>
       )}
 
-      <div className="w-full h-10 border-4 border-black bg-white rounded-full relative overflow-hidden mb-2">
+      <div className="w-full h-10 border-4 border-black bg-white rounded-full relative overflow-hidden mb-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
         <div
           className={`h-full border-r-4 border-black transition-all duration-500 ease-out ${
             isOverBudget ? 'bg-red-500 pattern-diagonal-lines' : 'bg-cyan-400'

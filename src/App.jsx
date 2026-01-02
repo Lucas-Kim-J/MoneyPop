@@ -290,10 +290,10 @@ export default function App() {
       <div className="max-w-5xl mx-auto px-4 pt-8 relative z-10">
         <header className="mb-10 flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
-            <h1 className="text-5xl md:text-6xl font-black italic tracking-tighter drop-shadow-[4px_4px_0px_rgba(255,0,255,1)]">
+            <h1 className="text-5xl md:text-6xl font-black italic tracking-tighter drop-shadow-[4px_4px_0px_rgba(255,0,255,1)] bg-white inline-block px-2 border-4 border-black rotate-[-2deg]">
               MONEY<span className="text-cyan-500">POP</span>
             </h1>
-            <p className="text-xl font-bold mt-2 text-slate-600 flex items-center gap-2">
+            <p className="text-xl font-bold mt-4 text-slate-600 flex items-center gap-2 bg-white/80 inline-block px-2 backdrop-blur-sm border-2 border-black rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
               双向记账，拒绝隐形贫困。
               <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded border border-purple-200 flex items-center gap-1">
                 <Sparkles size={12} /> AI Powered
@@ -302,7 +302,7 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <div className="bg-white border-4 border-black px-4 py-2 rounded-lg font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+            <div className="bg-white border-4 border-black px-4 py-2 rounded-lg font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 hover:rotate-2 transition-transform">
               <Wallet size={20} />
               <span>
                 {currentDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}

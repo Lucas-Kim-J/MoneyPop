@@ -68,7 +68,7 @@ export default function TransactionForm({
 
       {showSmartInput ? (
         <div className="space-y-4 animate-in fade-in zoom-in-95">
-          <div className="bg-purple-100 border-4 border-purple-300 rounded-lg p-3">
+          <div className="bg-purple-100 border-4 border-purple-300 rounded-lg p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
             <p className="font-bold text-purple-800 text-sm mb-2 flex items-center gap-2">
               <Bot size={16} /> AI 智能助手
             </p>
@@ -123,7 +123,7 @@ export default function TransactionForm({
                   className={`border-4 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all ${
                     category === cat.id
                       ? `border-black ${cat.color} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[1px] translate-y-[1px]`
-                      : 'border-slate-200 text-slate-400 hover:border-slate-400'
+                      : 'border-slate-200 text-slate-400 hover:border-slate-400 bg-white'
                   }`}
                 >
                   {cat.icon}
@@ -134,7 +134,7 @@ export default function TransactionForm({
           </div>
 
           {type === 'expense' && (
-            <div className="flex items-center gap-3 bg-red-50 p-3 rounded border-2 border-red-100">
+            <div className="flex items-center gap-3 bg-red-50 p-3 rounded border-2 border-red-100 shadow-[2px_2px_0px_0px_rgba(254,202,202,1)]">
               <input
                 type="checkbox"
                 id="impulse"

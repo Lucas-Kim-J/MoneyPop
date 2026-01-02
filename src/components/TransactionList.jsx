@@ -7,7 +7,9 @@ export default function TransactionList({ transactions, expenseCategories, incom
   return (
     <div className="lg:col-span-7">
       <div className="mb-6 flex items-center justify-between">
-        <h3 className="text-2xl font-black">近期流水</h3>
+        <h3 className="text-2xl font-black bg-white inline-block px-1 border-2 border-black rotate-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+          近期流水
+        </h3>
         <div className="flex gap-2">
           <span className="font-bold bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm border-2 border-green-200">
             收 {incomeCount}
@@ -20,7 +22,7 @@ export default function TransactionList({ transactions, expenseCategories, incom
 
       <div className="space-y-4">
         {transactions.length === 0 ? (
-          <div className="text-center py-20 opacity-50 border-4 border-dashed border-slate-300 rounded-xl">
+          <div className="text-center py-20 opacity-50 border-4 border-dashed border-slate-400 rounded-xl bg-slate-50">
             <div className="text-6xl mb-4">💤</div>
             <p className="font-bold text-xl">暂无记录，开始记账吧！</p>
           </div>
