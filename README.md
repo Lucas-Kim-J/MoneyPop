@@ -72,6 +72,7 @@ npm run preview
 └── src
     ├── App.jsx
     ├── components
+    │   ├── BackgroundDecor.jsx
     │   ├── BudgetOverview.jsx
     │   ├── Button.jsx
     │   ├── Card.jsx

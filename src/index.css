@@ -16,6 +16,12 @@ body {
   margin: 0;
 }
 
+.bg-dot-pattern {
+  background-color: #f8fafc;
+  background-image: radial-gradient(#94a3b8 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 .app {
   min-height: 100vh;
   display: grid;

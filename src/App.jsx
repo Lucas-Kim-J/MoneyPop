@@ -9,6 +9,7 @@ import RegretCard from './components/RegretCard.jsx';
 import TransactionForm from './components/TransactionForm.jsx';
 import TransactionList from './components/TransactionList.jsx';
 import UndoSticker from './components/UndoSticker.jsx';
+import BackgroundDecor from './components/BackgroundDecor.jsx';
 
 export default function App() {
   const [transactions, setTransactions] = useState(() => {
@@ -277,7 +278,8 @@ export default function App() {
   const currentCategories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-20 selection:bg-pink-400 selection:text-white">
+    <div className="min-h-screen font-sans text-slate-900 pb-20 selection:bg-pink-400 selection:text-white relative overflow-x-hidden bg-dot-pattern">
+      <BackgroundDecor />
       <div className="bg-black text-white py-2 overflow-hidden whitespace-nowrap sticky top-0 z-50 border-b-4 border-black">
         <div className="animate-marquee inline-block">
           $$$ 省钱就是赚钱 $$$ 别做月光族 $$$ 冲动是魔鬼 $$$ 你的钱去哪了？ $$$ 理性消费 $$$
@@ -285,7 +287,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 pt-8">
+      <div className="max-w-5xl mx-auto px-4 pt-8 relative z-10">
         <header className="mb-10 flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h1 className="text-5xl md:text-6xl font-black italic tracking-tighter drop-shadow-[4px_4px_0px_rgba(255,0,255,1)]">
