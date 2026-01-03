@@ -1,15 +1,36 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Frown, Smile, Sparkles, Wallet } from 'lucide-react';
+import { AlertTriangle, Frown, Smile, Sparkles, Wallet, X } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './data/categories.jsx';
 import { callDeepSeek } from './services/deepseek.js';
 import HeaderSnapshot from './components/HeaderSnapshot.jsx';
 import BudgetOverview from './components/BudgetOverview.jsx';
 import IncomeVault from './components/IncomeVault.jsx';
-import RegretCard from './components/RegretCard.jsx';
+import QuickEntryCard from './components/QuickEntryCard.jsx';
+import SubscriptionPanel from './components/SubscriptionPanel.jsx';
 import TransactionForm from './components/TransactionForm.jsx';
 import TransactionList from './components/TransactionList.jsx';
 import UndoSticker from './components/UndoSticker.jsx';
 import BackgroundDecor from './components/BackgroundDecor.jsx';
+
+function getTodayInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInput(value) {
+  if (!value) return new Date();
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function addDays(dateStr, days) {
+  const date = new Date(dateStr);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
 
 export default function App() {
   const [transactions, setTransactions] = useState(() => {
@@ -20,6 +41,16 @@ export default function App() {
   const [budget, setBudget] = useState(() => {
     const saved = localStorage.getItem('budget');
     return saved ? JSON.parse(saved) : 5000;
+  });
+
+  const [subscriptions, setSubscriptions] = useState(() => {
+    const saved = localStorage.getItem('subscriptions');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [pendingSubscriptions, setPendingSubscriptions] = useState(() => {
+    const saved = localStorage.getItem('subscriptionPending');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [isEditingBudget, setIsEditingBudget] = useState(false);
@@ -36,6 +67,12 @@ export default function App() {
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiRoast, setAiRoast] = useState('');
   const [isRoasting, setIsRoasting] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const [subName, setSubName] = useState('');
+  const [subAmount, setSubAmount] = useState('');
+  const [subCategory, setSubCategory] = useState(EXPENSE_CATEGORIES[0].id);
+  const [subFirstDate, setSubFirstDate] = useState(() => getTodayInputValue());
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [undoTx, setUndoTx] = useState(null);
@@ -49,6 +86,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('budget', JSON.stringify(budget));
   }, [budget]);
+
+  useEffect(() => {
+    localStorage.setItem('subscriptions', JSON.stringify(subscriptions));
+  }, [subscriptions]);
+
+  useEffect(() => {
+    localStorage.setItem('subscriptionPending', JSON.stringify(pendingSubscriptions));
+  }, [pendingSubscriptions]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -65,6 +110,30 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const now = new Date();
+    setPendingSubscriptions(prev => {
+      const existing = new Set(prev.map(item => item.subscriptionId));
+      const additions = [];
+
+      subscriptions.forEach(sub => {
+        const dueAt = new Date(sub.nextDueAt);
+        if (dueAt <= now && !existing.has(sub.id)) {
+          additions.push({
+            id: `${sub.id}-${dueAt.getTime()}`,
+            subscriptionId: sub.id,
+            name: sub.name,
+            amount: sub.amount,
+            category: sub.category,
+            dueAt: sub.nextDueAt
+          });
+        }
+      });
+
+      return additions.length ? [...additions, ...prev] : prev;
+    });
+  }, [subscriptions, currentDate]);
+
   const totalSpent = useMemo(
     () => transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0),
     [transactions]
@@ -73,14 +142,6 @@ export default function App() {
     () => transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0),
     [transactions]
   );
-  const impulseTotal = useMemo(
-    () =>
-      transactions
-        .filter(t => t.isImpulse && t.type === 'expense')
-        .reduce((acc, curr) => acc + curr.amount, 0),
-    [transactions]
-  );
-
   const netBalance = totalIncome - totalSpent;
   const remainingBudget = budget - totalSpent;
   const progressPercent = Math.min((totalSpent / budget) * 100, 100);
@@ -139,6 +200,18 @@ export default function App() {
   const dayDelta = snapshot.todayExpense - snapshot.yesterdayExpense;
   const weekDelta = snapshot.thisWeekExpense - snapshot.lastWeekExpense;
 
+  const triggerUndoSticker = newTx => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+    setUndoTx(newTx);
+    setShowUndoSticker(true);
+    undoTimerRef.current = setTimeout(() => {
+      setShowUndoSticker(false);
+      setUndoTx(null);
+    }, 6000);
+  };
+
   const handleAddTransaction = e => {
     e.preventDefault();
     if (!amount || isNaN(amount) || amount <= 0) return;
@@ -163,16 +236,8 @@ export default function App() {
     setIsImpulse(false);
     setSmartInputText('');
     setShowSmartInput(false);
-
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-    }
-    setUndoTx(newTx);
-    setShowUndoSticker(true);
-    undoTimerRef.current = setTimeout(() => {
-      setShowUndoSticker(false);
-      setUndoTx(null);
-    }, 6000);
+    setIsFormOpen(false);
+    triggerUndoSticker(newTx);
   };
 
   const handleDelete = id => {
@@ -182,6 +247,68 @@ export default function App() {
   const handleUpdateBudget = () => {
     setBudget(parseFloat(newBudgetInput));
     setIsEditingBudget(false);
+  };
+
+  const handleAddSubscription = e => {
+    e.preventDefault();
+    if (!subName.trim() || !subAmount || isNaN(subAmount) || subAmount <= 0) return;
+
+    const dueDate = parseDateInput(subFirstDate);
+    const newSub = {
+      id: Date.now(),
+      name: subName.trim(),
+      amount: parseFloat(subAmount),
+      category: subCategory,
+      nextDueAt: dueDate.toISOString(),
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+
+    setSubscriptions(prev => [newSub, ...prev]);
+    setSubName('');
+    setSubAmount('');
+    setSubCategory(EXPENSE_CATEGORIES[0].id);
+    setSubFirstDate(getTodayInputValue());
+  };
+
+  const handleDeleteSubscription = id => {
+    setSubscriptions(prev => prev.filter(sub => sub.id !== id));
+    setPendingSubscriptions(prev => prev.filter(item => item.subscriptionId !== id));
+  };
+
+  const handleConfirmPending = pendingId => {
+    const pending = pendingSubscriptions.find(item => item.id === pendingId);
+    if (!pending) return;
+
+    const newTx = {
+      id: Date.now(),
+      type: 'expense',
+      amount: pending.amount,
+      description: pending.name,
+      category: pending.category,
+      date: new Date().toISOString(),
+      isImpulse: false
+    };
+
+    setTransactions(prev => [newTx, ...prev]);
+    setSubscriptions(prev =>
+      prev.map(sub =>
+        sub.id === pending.subscriptionId ? { ...sub, nextDueAt: addDays(pending.dueAt, 30) } : sub
+      )
+    );
+    setPendingSubscriptions(prev => prev.filter(item => item.id !== pendingId));
+  };
+
+  const handleSkipPending = pendingId => {
+    const pending = pendingSubscriptions.find(item => item.id === pendingId);
+    if (!pending) return;
+
+    setSubscriptions(prev =>
+      prev.map(sub =>
+        sub.id === pending.subscriptionId ? { ...sub, nextDueAt: addDays(pending.dueAt, 30) } : sub
+      )
+    );
+    setPendingSubscriptions(prev => prev.filter(item => item.id !== pendingId));
   };
 
   const handleUndoLast = () => {
@@ -252,7 +379,6 @@ export default function App() {
       Act as a sarcastic, brutally honest, Neo-Brutalism style financial advisor. 
       Analyze the user's financial status:
       - Budget Remaining: ${remainingBudget} (Total Budget: ${budget})
-      - Impulse Spending: ${impulseTotal}
       - Recent Transactions: ${recentTx}
       
       Generate a short, punchy, funny, or roasting comment (max 40 words) in Chinese.
@@ -335,12 +461,57 @@ export default function App() {
 
           <div className="md:col-span-5 flex flex-col gap-6">
             <IncomeVault totalIncome={totalIncome} netBalance={netBalance} />
-            <RegretCard impulseTotal={impulseTotal} />
+            <QuickEntryCard onOpenForm={() => setIsFormOpen(true)} />
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5">
+            <SubscriptionPanel
+              subscriptions={subscriptions}
+              pendingItems={pendingSubscriptions}
+              formName={subName}
+              formAmount={subAmount}
+              formCategory={subCategory}
+              formDate={subFirstDate}
+              categories={EXPENSE_CATEGORIES}
+              onNameChange={e => setSubName(e.target.value)}
+              onAmountChange={e => setSubAmount(e.target.value)}
+              onCategoryChange={e => setSubCategory(e.target.value)}
+              onDateChange={e => setSubFirstDate(e.target.value)}
+              onAdd={handleAddSubscription}
+              onDelete={handleDeleteSubscription}
+              onConfirmPending={handleConfirmPending}
+              onSkipPending={handleSkipPending}
+            />
+          </div>
+
+          <TransactionList
+            transactions={transactions}
+            expenseCategories={EXPENSE_CATEGORIES}
+            incomeCategories={INCOME_CATEGORIES}
+            onDelete={handleDelete}
+          />
+        </div>
+      </div>
+
+      <UndoSticker show={showUndoSticker} undoTx={undoTx} onUndo={handleUndoLast} />
+
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-xl">
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-white border-2 border-black px-2 py-1 rounded font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                记一笔
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFormOpen(false)}
+                className="bg-white border-2 border-black p-2 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <X size={16} />
+              </button>
+            </div>
             <TransactionForm
               type={type}
               setType={setType}
@@ -360,19 +531,11 @@ export default function App() {
               onSmartEntry={handleSmartEntry}
               onSubmit={handleAddTransaction}
               currentCategories={currentCategories}
+              containerClassName="transition-colors duration-300"
             />
           </div>
-
-          <TransactionList
-            transactions={transactions}
-            expenseCategories={EXPENSE_CATEGORIES}
-            incomeCategories={INCOME_CATEGORIES}
-            onDelete={handleDelete}
-          />
         </div>
-      </div>
-
-      <UndoSticker show={showUndoSticker} undoTx={undoTx} onUndo={handleUndoLast} />
+      )}
 
       <style>{`
         @keyframes marquee {

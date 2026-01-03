@@ -20,10 +20,11 @@ export default function TransactionForm({
   isAiProcessing,
   onSmartEntry,
   onSubmit,
-  currentCategories
+  currentCategories,
+  containerClassName = 'sticky top-24 transition-colors duration-300'
 }) {
   return (
-    <Card className="sticky top-24 transition-colors duration-300" color={type === 'expense' ? 'bg-white' : 'bg-green-50'}>
+    <Card className={containerClassName} color={type === 'expense' ? 'bg-white' : 'bg-green-50'}>
       <div className="flex items-center justify-between mb-6 gap-2">
         <div className="flex gap-2 flex-1">
           <button

@@ -8,6 +8,7 @@ MoneyPop 是一个以本地记账为核心的前端应用，提供预算管理�
 - 预算与结余统计
 - AI 智能识别记账文本
 - AI 点评消费状态
+- 订阅提醒（30 天周期，确认后入账）
 - 本地数据存储（localStorage）
 
 ## 技术栈
@@ -52,7 +53,7 @@ npm run preview
 
 ## 数据存储说明
 
-- 数据保存在浏览器 localStorage（key: `transactions`, `budget`）
+- 数据保存在浏览器 localStorage（key: `transactions`, `budget`, `subscriptions`, `subscriptionPending`）
 - 本地与线上（GitHub Pages）数据不会互通
 
 ## 安全提示
@@ -78,7 +79,8 @@ npm run preview
     │   ├── Card.jsx
     │   ├── HeaderSnapshot.jsx
     │   ├── IncomeVault.jsx
-    │   ├── RegretCard.jsx
+    │   ├── QuickEntryCard.jsx
+    │   ├── SubscriptionPanel.jsx
     │   ├── TransactionForm.jsx
     │   ├── TransactionList.jsx
     │   └── UndoSticker.jsx
