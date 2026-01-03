@@ -17,7 +17,7 @@ export default function QuickEntryCard({ onOpenForm }) {
       </div>
       <p className="text-sm font-bold text-slate-600 mb-4 relative z-10">弹出记账窗口，支持 AI 智能填单。</p>
       <div className="relative z-10">
-        <Button onClick={onOpenForm} className="w-full py-4 text-lg" variant="black">
+        <Button onClick={onOpenForm} className="w-full !py-2 text-base" variant="black">
           <Plus size={18} /> 记一笔
         </Button>
       </div>
