@@ -20,7 +20,7 @@ export default function TransactionList({ transactions, expenseCategories, incom
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[520px] overflow-y-auto pr-2">
         {transactions.length === 0 ? (
           <div className="text-center py-20 opacity-50 border-4 border-dashed border-slate-400 rounded-xl bg-slate-50">
             <div className="text-6xl mb-4">💤</div>

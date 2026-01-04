@@ -11,6 +11,8 @@ import TransactionForm from './components/TransactionForm.jsx';
 import TransactionList from './components/TransactionList.jsx';
 import UndoSticker from './components/UndoSticker.jsx';
 import BackgroundDecor from './components/BackgroundDecor.jsx';
+import ExpenseCalendar from './components/ExpenseCalendar.jsx';
+import { formatDateKey, formatDateLabel } from './utils/date.js';
 
 function getTodayInputValue() {
   const today = new Date();
@@ -68,6 +70,7 @@ export default function App() {
   const [aiRoast, setAiRoast] = useState('');
   const [isRoasting, setIsRoasting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
 
   const [subName, setSubName] = useState('');
   const [subAmount, setSubAmount] = useState('');
@@ -101,6 +104,21 @@ export default function App() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isFormOpen && !selectedCalendarDate) return;
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') {
+        if (selectedCalendarDate) {
+          setSelectedCalendarDate(null);
+          return;
+        }
+        setIsFormOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFormOpen, selectedCalendarDate]);
 
   useEffect(() => {
     return () => {
@@ -142,6 +160,27 @@ export default function App() {
     () => transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0),
     [transactions]
   );
+
+  const expensesByDate = useMemo(() => {
+    const map = new Map();
+    transactions.forEach(tx => {
+      if (tx.type !== 'expense') return;
+      const key = formatDateKey(tx.date);
+      const entry = map.get(key) || { total: 0, items: [] };
+      entry.total += tx.amount;
+      entry.items.push(tx);
+      map.set(key, entry);
+    });
+    map.forEach(value => {
+      value.items.sort((a, b) => new Date(b.date) - new Date(a.date));
+    });
+    return map;
+  }, [transactions]);
+
+  const selectedDateInfo = selectedCalendarDate ? expensesByDate.get(selectedCalendarDate) : null;
+  const selectedDateItems = selectedDateInfo ? selectedDateInfo.items : [];
+  const selectedDateTotal = selectedDateInfo ? selectedDateInfo.total : 0;
+  const selectedDateLabel = selectedCalendarDate ? formatDateLabel(selectedCalendarDate) : '';
   const netBalance = totalIncome - totalSpent;
   const remainingBudget = budget - totalSpent;
   const progressPercent = Math.min((totalSpent / budget) * 100, 100);
@@ -493,6 +532,14 @@ export default function App() {
             onDelete={handleDelete}
           />
         </div>
+
+        <div className="mt-12">
+          <ExpenseCalendar
+            expensesByDate={expensesByDate}
+            selectedDate={selectedCalendarDate}
+            onSelectDate={setSelectedCalendarDate}
+          />
+        </div>
       </div>
 
       <UndoSticker show={showUndoSticker} undoTx={undoTx} onUndo={handleUndoLast} />
@@ -533,6 +580,66 @@ export default function App() {
               currentCategories={currentCategories}
               containerClassName="transition-colors duration-300"
             />
+          </div>
+        </div>
+      )}
+
+      {selectedCalendarDate && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-10"
+          onClick={() => setSelectedCalendarDate(null)}
+        >
+          <div className="w-full max-w-xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-white border-2 border-black px-2 py-1 rounded font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                {selectedDateLabel}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCalendarDate(null)}
+                className="bg-white border-2 border-black p-2 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-white border-4 border-black rounded-xl p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-black text-lg">当日消费</div>
+                <div className="font-black text-xl">-¥{selectedDateTotal.toFixed(2)}</div>
+              </div>
+
+              {selectedDateItems.length === 0 ? (
+                <div className="text-center py-12 border-4 border-dashed border-slate-300 rounded-xl bg-slate-50">
+                  <div className="text-4xl mb-2">🌤️</div>
+                  <p className="font-bold text-sm">这一天没有消费记录</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDateItems.map(tx => {
+                    const cat = EXPENSE_CATEGORIES.find(c => c.id === tx.category);
+                    return (
+                      <div
+                        key={tx.id}
+                        className="border-2 border-black rounded-lg p-3 flex items-center justify-between bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                      >
+                        <div>
+                          <div className="font-bold">{tx.description}</div>
+                          <div className="text-xs font-bold text-slate-400">
+                            {new Date(tx.date).toLocaleTimeString('zh-CN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                            {cat ? ` · ${cat.name}` : ''}
+                          </div>
+                        </div>
+                        <div className="font-black text-lg text-black">-¥{tx.amount.toFixed(2)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
