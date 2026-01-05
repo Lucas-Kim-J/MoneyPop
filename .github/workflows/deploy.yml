@@ -27,6 +27,8 @@ jobs:
           VITE_DEEPSEEK_API_KEY: ${{ secrets.VITE_DEEPSEEK_API_KEY }}
           VITE_DEEPSEEK_MODEL: deepseek-chat
           VITE_DEEPSEEK_BASE_URL: https://api.deepseek.com
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
