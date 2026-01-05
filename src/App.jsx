@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Frown, Smile, Sparkles, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Frown, Smile, Sparkles, Wallet, X, UserCircle2, LogIn, LogOut } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './data/categories.jsx';
 import { callDeepSeek } from './services/deepseek.js';
 import HeaderSnapshot from './components/HeaderSnapshot.jsx';
@@ -12,7 +12,10 @@ import TransactionList from './components/TransactionList.jsx';
 import UndoSticker from './components/UndoSticker.jsx';
 import BackgroundDecor from './components/BackgroundDecor.jsx';
 import ExpenseCalendar from './components/ExpenseCalendar.jsx';
+import AuthPanel from './components/AuthPanel.jsx';
+import Button from './components/Button.jsx';
 import { formatDateKey, formatDateLabel } from './utils/date.js';
+import { supabase, supabaseEnabled } from './services/supabase.js';
 
 function getTodayInputValue() {
   const today = new Date();
@@ -32,6 +35,19 @@ function addDays(dateStr, days) {
   const date = new Date(dateStr);
   date.setDate(date.getDate() + days);
   return date.toISOString();
+}
+
+function mergeById(remoteItems, localItems) {
+  const map = new Map();
+  remoteItems.forEach(item => {
+    map.set(item.id, item);
+  });
+  localItems.forEach(item => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
+  });
+  return Array.from(map.values());
 }
 
 export default function App() {
@@ -71,6 +87,17 @@ export default function App() {
   const [isRoasting, setIsRoasting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
+  const [session, setSession] = useState(null);
+  const [authChecked, setAuthChecked] = useState(!supabaseEnabled);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const [hasDismissedAuthPrompt, setHasDismissedAuthPrompt] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [syncState, setSyncState] = useState('idle');
+  const [syncError, setSyncError] = useState('');
+  const [lastSyncAt, setLastSyncAt] = useState(null);
 
   const [subName, setSubName] = useState('');
   const [subAmount, setSubAmount] = useState('');
@@ -81,6 +108,9 @@ export default function App() {
   const [undoTx, setUndoTx] = useState(null);
   const [showUndoSticker, setShowUndoSticker] = useState(false);
   const undoTimerRef = useRef(null);
+  const syncTimerRef = useRef(null);
+  const isHydratingRef = useRef(false);
+  const isSyncingRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem('transactions', JSON.stringify(transactions));
@@ -88,6 +118,10 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('budget', JSON.stringify(budget));
+  }, [budget]);
+
+  useEffect(() => {
+    setNewBudgetInput(budget);
   }, [budget]);
 
   useEffect(() => {
@@ -106,19 +140,71 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isFormOpen && !selectedCalendarDate) return;
-    const handleKeyDown = event => {
-      if (event.key === 'Escape') {
-        if (selectedCalendarDate) {
-          setSelectedCalendarDate(null);
-          return;
-        }
-        setIsFormOpen(false);
+    if (!supabase) return;
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (isMounted) {
+        setSession(data.session);
+        setAuthChecked(true);
       }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthChecked(true);
+      if (nextSession) {
+        setHasDismissedAuthPrompt(true);
+      } else {
+        setHasDismissedAuthPrompt(false);
+        setIsUserMenuOpen(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleDismissAuthPrompt = () => {
+    setIsAuthPromptOpen(false);
+    setHasDismissedAuthPrompt(true);
+  };
+
+  useEffect(() => {
+    if (!isFormOpen && !selectedCalendarDate && !isAuthPromptOpen) return;
+    const handleKeyDown = event => {
+      if (event.key !== 'Escape') return;
+      if (isAuthPromptOpen) {
+        handleDismissAuthPrompt();
+        return;
+      }
+      if (selectedCalendarDate) {
+        setSelectedCalendarDate(null);
+        return;
+      }
+      setIsFormOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFormOpen, selectedCalendarDate]);
+  }, [isFormOpen, selectedCalendarDate, isAuthPromptOpen]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) {
+      setIsAuthPromptOpen(false);
+      return;
+    }
+    if (!authChecked) return;
+    if (session) {
+      setIsAuthPromptOpen(false);
+      setHasDismissedAuthPrompt(true);
+      return;
+    }
+    if (!hasDismissedAuthPrompt) {
+      setIsAuthPromptOpen(true);
+    }
+  }, [authChecked, session, hasDismissedAuthPrompt, supabaseEnabled]);
 
   useEffect(() => {
     return () => {
@@ -152,6 +238,177 @@ export default function App() {
     });
   }, [subscriptions, currentDate]);
 
+  useEffect(() => {
+    if (!session || !supabase) {
+      setSyncState('idle');
+      setSyncError('');
+      setLastSyncAt(null);
+      return;
+    }
+
+    const hydrateFromSupabase = async () => {
+      const userId = session.user.id;
+      isHydratingRef.current = true;
+      setSyncState('syncing');
+      setSyncError('');
+
+      try {
+        const [txRes, subRes, pendingRes, settingsRes] = await Promise.all([
+          supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
+          supabase.from('subscriptions').select('*').eq('user_id', userId).order('next_due_at', { ascending: true }),
+          supabase.from('subscription_pending').select('*').eq('user_id', userId).order('due_at', { ascending: true }),
+          supabase.from('user_settings').select('budget, updated_at').eq('user_id', userId).single()
+        ]);
+
+        if (txRes.error) throw txRes.error;
+        if (subRes.error) throw subRes.error;
+        if (pendingRes.error) throw pendingRes.error;
+        if (settingsRes.error && settingsRes.error.code !== 'PGRST116') throw settingsRes.error;
+
+        const remoteTransactions = (txRes.data || []).map(row => ({
+          id: row.id,
+          type: row.type,
+          amount: Number(row.amount),
+          description: row.description,
+          category: row.category,
+          date: row.date,
+          isImpulse: row.is_impulse
+        }));
+
+        const remoteSubscriptions = (subRes.data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          amount: Number(row.amount),
+          category: row.category,
+          nextDueAt: row.next_due_at,
+          active: row.active,
+          createdAt: row.created_at
+        }));
+
+        const remotePending = (pendingRes.data || []).map(row => ({
+          id: row.id,
+          subscriptionId: row.subscription_id,
+          name: row.name,
+          amount: Number(row.amount),
+          category: row.category,
+          dueAt: row.due_at
+        }));
+
+        const mergedTransactions = mergeById(remoteTransactions, transactions).sort(
+          (a, b) => new Date(b.date) - new Date(a.date)
+        );
+        const mergedSubscriptions = mergeById(remoteSubscriptions, subscriptions);
+        const mergedPending = mergeById(remotePending, pendingSubscriptions);
+
+        setTransactions(mergedTransactions);
+        setSubscriptions(mergedSubscriptions);
+        setPendingSubscriptions(mergedPending);
+
+        if (settingsRes.data && typeof settingsRes.data.budget !== 'undefined') {
+          setBudget(Number(settingsRes.data.budget));
+        }
+
+        setSyncState('success');
+        setLastSyncAt(new Date());
+      } catch (error) {
+        console.error('Supabase hydrate failed', error);
+        setSyncState('error');
+        setSyncError('云端读取失败，请稍后重试');
+      } finally {
+        isHydratingRef.current = false;
+      }
+    };
+
+    hydrateFromSupabase();
+  }, [session]);
+
+  const syncToSupabase = async () => {
+    if (!session || !supabase) return;
+    if (isHydratingRef.current || isSyncingRef.current) return;
+
+    isSyncingRef.current = true;
+    setSyncState('syncing');
+    setSyncError('');
+
+    const userId = session.user.id;
+    const txPayload = transactions.map(tx => ({
+      id: tx.id,
+      user_id: userId,
+      type: tx.type,
+      amount: tx.amount,
+      description: tx.description,
+      category: tx.category,
+      date: tx.date,
+      is_impulse: tx.isImpulse
+    }));
+    const subPayload = subscriptions.map(sub => ({
+      id: sub.id,
+      user_id: userId,
+      name: sub.name,
+      amount: sub.amount,
+      category: sub.category,
+      next_due_at: sub.nextDueAt,
+      active: sub.active,
+      created_at: sub.createdAt
+    }));
+    const pendingPayload = pendingSubscriptions.map(item => ({
+      id: item.id,
+      user_id: userId,
+      subscription_id: item.subscriptionId,
+      name: item.name,
+      amount: item.amount,
+      category: item.category,
+      due_at: item.dueAt,
+      created_at: item.createdAt || new Date().toISOString()
+    }));
+
+    const replaceTableData = async (table, rows) => {
+      const { error: deleteError } = await supabase.from(table).delete().eq('user_id', userId);
+      if (deleteError) throw deleteError;
+      if (!rows.length) return;
+      const { error: insertError } = await supabase.from(table).insert(rows);
+      if (insertError) throw insertError;
+    };
+
+    try {
+      await Promise.all([
+        replaceTableData('transactions', txPayload),
+        replaceTableData('subscriptions', subPayload),
+        replaceTableData('subscription_pending', pendingPayload),
+        supabase
+          .from('user_settings')
+          .upsert({ user_id: userId, budget, updated_at: new Date().toISOString() })
+      ]);
+
+      setSyncState('success');
+      setLastSyncAt(new Date());
+    } catch (error) {
+      console.error('Supabase sync failed', error);
+      setSyncState('error');
+      setSyncError('云端同步失败，请检查网络或权限');
+    } finally {
+      isSyncingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!session || !supabase) return;
+    if (isHydratingRef.current) return;
+
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = setTimeout(() => {
+      syncToSupabase();
+    }, 800);
+
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, [transactions, subscriptions, pendingSubscriptions, budget, session]);
+
   const totalSpent = useMemo(
     () => transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0),
     [transactions]
@@ -184,6 +441,8 @@ export default function App() {
   const netBalance = totalIncome - totalSpent;
   const remainingBudget = budget - totalSpent;
   const progressPercent = Math.min((totalSpent / budget) * 100, 100);
+  const showAuthWarning = supabaseEnabled && !session;
+  const showUserWidget = supabaseEnabled && authChecked && (session || hasDismissedAuthPrompt);
 
   const isOverBudget = totalSpent > budget;
   const isWarning = totalSpent > budget * 0.8 && !isOverBudget;
@@ -238,6 +497,52 @@ export default function App() {
 
   const dayDelta = snapshot.todayExpense - snapshot.yesterdayExpense;
   const weekDelta = snapshot.thisWeekExpense - snapshot.lastWeekExpense;
+
+  const handleSignIn = async () => {
+    if (!supabase) return;
+    if (!authEmail || !authPassword) {
+      alert('请输入邮箱和密码');
+      return;
+    }
+    setIsAuthLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword
+    });
+    if (error) {
+      alert(`登录失败：${error.message}`);
+    }
+    setIsAuthLoading(false);
+  };
+
+  const handleSignUp = async () => {
+    if (!supabase) return;
+    if (!authEmail || !authPassword) {
+      alert('请输入邮箱和密码');
+      return;
+    }
+    setIsAuthLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email: authEmail,
+      password: authPassword
+    });
+    if (error) {
+      alert(`注册失败：${error.message}`);
+    } else {
+      alert('注册成功，请前往邮箱验证并登录');
+    }
+    setIsAuthLoading(false);
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    setIsAuthLoading(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      alert(`退出失败：${error.message}`);
+    }
+    setIsAuthLoading(false);
+  };
 
   const triggerUndoSticker = newTx => {
     if (undoTimerRef.current) {
@@ -466,7 +771,7 @@ export default function App() {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 items-start">
             <div className="bg-white border-4 border-black px-4 py-2 rounded-lg font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 hover:rotate-2 transition-transform">
               <Wallet size={20} />
               <span>
@@ -477,6 +782,54 @@ export default function App() {
               </span>
             </div>
             <HeaderSnapshot snapshot={snapshot} dayDelta={dayDelta} weekDelta={weekDelta} />
+
+            {showUserWidget && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen(prev => !prev)}
+                  className="bg-white border-4 border-black px-3 py-2 rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 font-bold text-xs"
+                >
+                  <UserCircle2 size={16} />
+                  <span>{session ? '已登录' : '未登录'}</span>
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-60 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-3 z-20">
+                    {session ? (
+                      <div className="space-y-3">
+                        <div className="text-xs font-bold text-slate-500">当前账号</div>
+                        <div className="text-sm font-black break-all">{session.user.email}</div>
+                        <Button
+                          onClick={() => {
+                            handleSignOut();
+                            setIsUserMenuOpen(false);
+                          }}
+                          variant="neutral"
+                          className="w-full !py-2 text-sm"
+                        >
+                          <LogOut size={16} /> 退出登录
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="text-xs font-bold text-slate-500">当前未登录</div>
+                        <Button
+                          onClick={() => {
+                            setIsAuthPromptOpen(true);
+                            setIsUserMenuOpen(false);
+                          }}
+                          variant="black"
+                          className="w-full !py-2 text-sm"
+                        >
+                          <LogIn size={16} /> 去登录
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -510,6 +863,7 @@ export default function App() {
             expenseCategories={EXPENSE_CATEGORIES}
             incomeCategories={INCOME_CATEGORIES}
             onDelete={handleDelete}
+            showAuthWarning={showAuthWarning}
           />
 
           <div className="lg:col-span-5">
@@ -543,6 +897,47 @@ export default function App() {
       </div>
 
       <UndoSticker show={showUndoSticker} undoTx={undoTx} onUndo={handleUndoLast} />
+
+      {isAuthPromptOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-10"
+          onClick={handleDismissAuthPrompt}
+        >
+          <div className="w-full max-w-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-white border-2 border-black px-2 py-1 rounded font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                登录提醒
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissAuthPrompt}
+                className="bg-white border-2 border-black p-2 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <AuthPanel
+              supabaseEnabled={supabaseEnabled}
+              session={session}
+              email={authEmail}
+              password={authPassword}
+              onEmailChange={e => setAuthEmail(e.target.value)}
+              onPasswordChange={e => setAuthPassword(e.target.value)}
+              onSignIn={handleSignIn}
+              onSignUp={handleSignUp}
+              onSignOut={handleSignOut}
+              isAuthLoading={isAuthLoading}
+              syncState={syncState}
+              lastSyncAt={lastSyncAt}
+              syncError={syncError}
+              className=""
+            />
+            <div className="mt-3 text-xs font-bold text-slate-600 text-center">
+              关闭后仍可使用，但未登录可能导致数据丢失。
+            </div>
+          </div>
+        </div>
+      )}
 
       {isFormOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-10">

@@ -1,6 +1,12 @@
 import { Trash2 } from 'lucide-react';
 
-export default function TransactionList({ transactions, expenseCategories, incomeCategories, onDelete }) {
+export default function TransactionList({
+  transactions,
+  expenseCategories,
+  incomeCategories,
+  onDelete,
+  showAuthWarning
+}) {
   const incomeCount = transactions.filter(t => t.type === 'income').length;
   const expenseCount = transactions.filter(t => t.type === 'expense').length;
 
@@ -19,6 +25,12 @@ export default function TransactionList({ transactions, expenseCategories, incom
           </span>
         </div>
       </div>
+
+      {showAuthWarning && (
+        <div className="mb-4 border-2 border-dashed border-yellow-400 bg-yellow-100 text-yellow-900 px-3 py-2 rounded-lg text-sm font-bold">
+          未登录可能导致数据丢失，建议登录以同步到云端。
+        </div>
+      )}
 
       <div className="space-y-4 max-h-[520px] overflow-y-auto pr-2">
         {transactions.length === 0 ? (
