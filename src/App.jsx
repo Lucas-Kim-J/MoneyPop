@@ -505,6 +505,13 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <TransactionList
+            transactions={transactions}
+            expenseCategories={EXPENSE_CATEGORIES}
+            incomeCategories={INCOME_CATEGORIES}
+            onDelete={handleDelete}
+          />
+
           <div className="lg:col-span-5">
             <SubscriptionPanel
               subscriptions={subscriptions}
@@ -524,13 +531,6 @@ export default function App() {
               onSkipPending={handleSkipPending}
             />
           </div>
-
-          <TransactionList
-            transactions={transactions}
-            expenseCategories={EXPENSE_CATEGORIES}
-            incomeCategories={INCOME_CATEGORIES}
-            onDelete={handleDelete}
-          />
         </div>
 
         <div className="mt-12">

@@ -83,33 +83,35 @@ export default function SubscriptionPanel({
 
       <div className="mt-4 border-t-2 border-dashed border-slate-300 pt-4">
         <div className="text-xs font-black text-slate-500 mb-2">订阅清单</div>
-        {subscriptions.length === 0 ? (
-          <div className="text-sm text-slate-500">暂无订阅，添加一个试试。</div>
-        ) : (
-          <div className="space-y-2">
-            {subscriptions.map(sub => {
-              const daysLeft = daysUntil(sub.nextDueAt);
-              return (
-                <div key={sub.id} className="bg-slate-50 border-2 border-black rounded p-2 flex items-center justify-between">
-                  <div>
-                    <div className="font-black text-sm">{sub.name}</div>
-                    <div className="text-xs text-slate-600">
-                      ¥{sub.amount.toFixed(2)} · 下次 {formatDate(sub.nextDueAt)} · {daysLeft}天后
+        <div className="max-h-[520px] overflow-y-auto pr-2">
+          {subscriptions.length === 0 ? (
+            <div className="text-sm text-slate-500">暂无订阅，添加一个试试。</div>
+          ) : (
+            <div className="space-y-2">
+              {subscriptions.map(sub => {
+                const daysLeft = daysUntil(sub.nextDueAt);
+                return (
+                  <div key={sub.id} className="bg-slate-50 border-2 border-black rounded p-2 flex items-center justify-between">
+                    <div>
+                      <div className="font-black text-sm">{sub.name}</div>
+                      <div className="text-xs text-slate-600">
+                        ¥{sub.amount.toFixed(2)} · 下次 {formatDate(sub.nextDueAt)} · {daysLeft}天后
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(sub.id)}
+                      className="bg-white border-2 border-black p-1 rounded hover:bg-red-100"
+                      title="删除订阅"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(sub.id)}
-                    className="bg-white border-2 border-black p-1 rounded hover:bg-red-100"
-                    title="删除订阅"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <form onSubmit={onAdd} className="mt-4 space-y-2">
